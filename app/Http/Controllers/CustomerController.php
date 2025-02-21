@@ -19,12 +19,26 @@ class CustomerController extends Controller
         $queryPrams = $request->all();
         $query = Customer::query();
 
-        foreach ($queryPrams as $key => $value) {
-            if (!empty($value)) {
-                $query->where($key,"like","%{$value}%");
+        if (isset($queryPrams["filter"])) {
+            foreach ($queryPrams["filter"] as $key => $value) {
+                if (!empty($value)) {
+                    $query->where($key, "like", "%{$value}%");
+                }
             }
         }
-        return CustomerResource::collection($query->paginate(10));
+        if (isset($queryPrams["sort"])) {
+            foreach ($queryPrams["sort"] as $key => $value) {
+                if (!empty($value)) {
+                    $query->orderBy($key, $value);
+                }
+            }
+        }
+        return response()->json(CustomerResource::collection($query->paginate(
+            $queryPrams["page"]["size"]??10,
+            ['*'],
+            $queryPrams['page']['number']??"1",
+            $queryPrams['page']['number']?? null
+        )))->header("x-api-version","v1");
     }
 
     /**
@@ -33,8 +47,7 @@ class CustomerController extends Controller
     public function store(StoreCustomerRequest $request)
     {
         $validatedData = $request->validated();
-        dd($validatedData); 
-        return new CustomerResource(Customer::create($request->validated())); 
+        return new CustomerResource(Customer::create($validatedData));
     }
 
     /**
@@ -42,7 +55,9 @@ class CustomerController extends Controller
      */
     public function show(string $id)
     {
-        return Customer::findOrFail($id);
+        return response()->json(
+            ["Customer" => Customer::findOrFail($id)]
+        )->header("x-api-version","v1");
     }
 
     /**
@@ -58,6 +73,8 @@ class CustomerController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $customer = Customer::findOrFail($id);
+        $customer->delete();
+        return response()->json(new CustomerResource($customer))->header("x-api-version","v1");
     }
 }
